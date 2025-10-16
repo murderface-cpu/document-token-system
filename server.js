@@ -71,7 +71,7 @@ async function createIndexes() {
 
 // Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-key';
-const TOKEN_PRICE = 30; // KSH per token
+const TOKEN_PRICE = 1; // KSH per token
 
 // M-Pesa Configuration
 const MPESA_CONFIG = {
@@ -681,3 +681,4 @@ connectDB().then(() => {
   });
 
 });
+
