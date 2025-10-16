@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(cors({origin: 'https://n-alobkaf7y666kv4bbv4qm3252t7tqnixej4ueea-0lu-script.googleusercontent.com'}));
 
 // MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/' || 'mongodb+srv://ravenphyco5150_db_user:ravenphycho@docaccess.frs0dug.mongodb.net/';
+const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = process.env.DB_NAME || 'document_store';
 let db;
 
@@ -679,4 +679,5 @@ connectDB().then(() => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 M-Pesa Environment: ${MPESA_CONFIG.environment}`);
   });
+
 });
