@@ -150,48 +150,39 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
       `${MPESA_CONFIG.businessShortCode}${MPESA_CONFIG.passkey}${timestamp}`
     ).toString('base64');
 
-    const formattedPhone = phoneNumber.startsWith('254') 
-      ? phoneNumber 
-      : phoneNumber.startsWith('0') 
+    const formattedPhone = phoneNumber.startsWith('254')
+      ? phoneNumber
+      : phoneNumber.startsWith('0')
       ? '254' + phoneNumber.slice(1)
       : '254' + phoneNumber;
 
-    const response = await axios.post(
-      `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
-      {
-        BusinessShortCode: MPESA_CONFIG.businessShortCode,
-        Password: password,
-        Timestamp: timestamp,
-        TransactionType: 'CustomerPayBillOnline',
-        Amount: Math.round(amount),
-        PartyA: formattedPhone,
-        PartyB: MPESA_CONFIG.businessShortCode,
-        PhoneNumber: formattedPhone,
-        CallBackURL: MPESA_CONFIG.callbackUrl,
-        AccountReference: accountReference,
-        TransactionDesc: `Purchase ${accountReference}`
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
+    const payload = {
+      BusinessShortCode: MPESA_CONFIG.businessShortCode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: amount,
+      PartyA: formattedPhone,
+      PartyB: MPESA_CONFIG.businessShortCode,
+      PhoneNumber: formattedPhone,
+      CallBackURL: MPESA_CONFIG.callbackUrl,
+      AccountReference: accountReference,
+      TransactionDesc: 'Token purchase'
+    };
+
+    console.log('🟩 Sending STK Push payload:', payload);
+
+    const { data } = await axios.post(
+      MPESA_CONFIG.stkPushUrl,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    return {
-      success: true,
-      checkoutRequestId: response.data.CheckoutRequestID,
-      merchantRequestId: response.data.MerchantRequestID,
-      responseCode: response.data.ResponseCode,
-      responseDescription: response.data.ResponseDescription
-    };
+    console.log('🟦 M-Pesa STK Push response:', data);
+    return data;
   } catch (error) {
-    console.error('STK Push error:', error.response?.data || error.message);
-    return {
-      success: false,
-      error: error.response?.data?.errorMessage || 'Failed to initiate payment'
-    };
+    console.error('🟥 STK Push error:', error.response?.data || error.message);
+    throw error;
   }
 }
 
@@ -681,4 +672,5 @@ connectDB().then(() => {
   });
 
 });
+
 
