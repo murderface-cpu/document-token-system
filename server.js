@@ -282,6 +282,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
 app.post('/api/user/use-token', authenticateToken, async (req, res) => {
   const userId = new ObjectId(req.user.id);
   const { documentId, tokensUsed, documentName } = req.body;
+  console.log(req.body);
   const cost = parseInt(tokensUsed || 1);
 
   try {
@@ -817,6 +818,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
