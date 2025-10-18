@@ -437,17 +437,24 @@ app.get('/api/payment/status/:paymentId', authenticateToken, async (req, res) =>
 });
 
 // ==================== M-PESA CALLBACK ====================
-
 app.post('/api/mpesa/callback', async (req, res) => {
   try {
-    console.log('M-Pesa Callback:', JSON.stringify(req.body, null, 2));
+    console.log('📞 M-Pesa Callback received:', JSON.stringify(req.body, null, 2));
 
     const { Body } = req.body;
-    const { stkCallback } = Body;
+    
+    // Handle case where Body might not exist
+    if (!Body || !Body.stkCallback) {
+      console.log('⚠️ Invalid callback structure');
+      return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
+    }
 
+    const { stkCallback } = Body;
     const checkoutRequestId = stkCallback.CheckoutRequestID;
     const resultCode = stkCallback.ResultCode;
     const resultDesc = stkCallback.ResultDesc;
+
+    console.log(`📊 Callback details - CheckoutID: ${checkoutRequestId}, ResultCode: ${resultCode}`);
 
     // Find payment record
     const payment = await db.collection('payments').findOne({ 
@@ -455,7 +462,7 @@ app.post('/api/mpesa/callback', async (req, res) => {
     });
 
     if (!payment) {
-      console.error('Payment not found for checkout:', checkoutRequestId);
+      console.error('❌ Payment not found for checkout:', checkoutRequestId);
       return res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
 
@@ -494,13 +501,14 @@ app.post('/api/mpesa/callback', async (req, res) => {
 
       console.log(`✅ Payment successful. Added ${payment.tokensPurchased} tokens to user ${payment.userId}`);
     } else {
-      // Payment failed
+      // Payment failed or cancelled
       await db.collection('payments').updateOne(
         { _id: payment._id },
         { 
           $set: { 
             status: 'failed',
-            resultDesc
+            resultDesc,
+            failedAt: new Date()
           }
         }
       );
@@ -508,13 +516,14 @@ app.post('/api/mpesa/callback', async (req, res) => {
       console.log(`❌ Payment failed: ${resultDesc}`);
     }
 
+    // Always return success to M-Pesa
     res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   } catch (error) {
-    console.error('Callback error:', error);
-    res.json({ ResultCode: 1, ResultDesc: 'Error processing callback' });
+    console.error('❌ Callback error:', error);
+    // Still return success to avoid M-Pesa retries
+    res.json({ ResultCode: 0, ResultDesc: 'Accepted' });
   }
 });
-
 // ==================== DOCUMENT ROUTES ====================
 
 app.get('/api/documents', (req, res) => {
@@ -706,6 +715,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
