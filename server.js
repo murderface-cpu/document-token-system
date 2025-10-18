@@ -299,7 +299,7 @@ app.post('/api/user/use-token', authenticateToken, async (req, res) => {
     await db.collection('downloads').insertOne({
       userId,
       documentId,
-      documentName,
+      documentName: documentName,
       tokensUsed: cost,
       createdAt: new Date()
     });
@@ -817,6 +817,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
