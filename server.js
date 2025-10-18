@@ -144,34 +144,59 @@ async function getMpesaToken() {
 
 async function initiateStkPush(phoneNumber, amount, accountReference) {
   try {
+    console.log('🚀 Initiating STK Push...');
+    console.log('📱 Phone:', phoneNumber, '| Amount:', amount, '| Reference:', accountReference);
+
+    // Get M-Pesa access token
     const token = await getMpesaToken();
+    
+    // Generate timestamp and password
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
     const password = Buffer.from(
       `${MPESA_CONFIG.businessShortCode}${MPESA_CONFIG.passkey}${timestamp}`
     ).toString('base64');
 
-    const formattedPhone = phoneNumber.startsWith('254') 
-      ? phoneNumber 
-      : phoneNumber.startsWith('0') 
-      ? '254' + phoneNumber.slice(1)
-      : '254' + phoneNumber;
+    // Format phone number to 254XXXXXXXXX
+    let formattedPhone = phoneNumber.replace(/[\s\-\(\)]/g, ''); // Remove spaces and special chars
+    
+    if (formattedPhone.startsWith('254') && formattedPhone.length === 12) {
+      // Already correct format
+    } else if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
+      formattedPhone = '254' + formattedPhone.slice(1);
+    } else if (formattedPhone.startsWith('7') && formattedPhone.length === 9) {
+      formattedPhone = '254' + formattedPhone;
+    } else if (formattedPhone.startsWith('+254')) {
+      formattedPhone = formattedPhone.slice(1);
+    } else {
+      throw new Error('Invalid phone number format. Expected: 254XXXXXXXXX or 07XXXXXXXX');
+    }
 
+    console.log('📞 Formatted phone:', formattedPhone);
+
+    // Validate amount (must be at least 1 KES)
+    const roundedAmount = Math.round(amount);
+    if (roundedAmount < 1) {
+      throw new Error('Amount must be at least 1 KES');
+    }
+
+    // Prepare STK Push payload
     const payload = {
       BusinessShortCode: MPESA_CONFIG.businessShortCode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: Math.round(amount),
+      Amount: roundedAmount,
       PartyA: formattedPhone,
       PartyB: MPESA_CONFIG.businessShortCode,
       PhoneNumber: formattedPhone,
       CallBackURL: MPESA_CONFIG.callbackUrl,
-      AccountReference: accountReference,
+      AccountReference: accountReference.substring(0, 12), // M-Pesa limits to 12 chars
       TransactionDesc: 'Token purchase'
     };
 
-    console.log('📤 Sending STK Push payload:', payload);
+    console.log('📤 Sending STK Push payload:', JSON.stringify(payload, null, 2));
 
+    // Send STK Push request
     const response = await axios.post(
       `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
       payload,
@@ -179,36 +204,79 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 30000 // 30 second timeout
       }
     );
 
-    console.log('🟦 M-Pesa STK Push response:', response.data);
+    console.log('🟦 M-Pesa STK Push response:', JSON.stringify(response.data, null, 2));
 
-    // ✅ Check for successful response
+    // Check for successful response
     if (response.data.ResponseCode === '0') {
+      console.log('✅ STK Push sent successfully');
+      console.log('📱 CheckoutRequestID:', response.data.CheckoutRequestID);
+      console.log('🔍 User should receive prompt on phone:', formattedPhone);
+      
       return {
         success: true,
         checkoutRequestId: response.data.CheckoutRequestID,
         merchantRequestId: response.data.MerchantRequestID,
         responseCode: response.data.ResponseCode,
-        responseDescription: response.data.ResponseDescription
+        responseDescription: response.data.ResponseDescription,
+        customerMessage: response.data.CustomerMessage
       };
     } else {
+      // M-Pesa returned an error code
+      console.error('❌ M-Pesa rejected request:', response.data.ResponseDescription);
       return {
         success: false,
-        error: response.data.ResponseDescription || response.data.CustomerMessage
+        error: response.data.ResponseDescription || response.data.CustomerMessage || 'Request rejected by M-Pesa'
       };
     }
   } catch (error) {
-    console.error('❌ STK Push error:', error.response?.data || error.message);
-    return {
-      success: false,
-      error: error.response?.data?.errorMessage || error.response?.data?.ResponseDescription || 'Failed to initiate payment'
-    };
+    // Handle different types of errors
+    if (error.response) {
+      // M-Pesa API returned an error response
+      console.error('❌ M-Pesa API Error:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+
+      const errorMessage = error.response.data?.errorMessage 
+        || error.response.data?.ResponseDescription 
+        || error.response.data?.errorCode
+        || 'M-Pesa API error';
+
+      return {
+        success: false,
+        error: errorMessage,
+        details: error.response.data
+      };
+    } else if (error.request) {
+      // Request was made but no response received (network error)
+      console.error('❌ Network Error - No response from M-Pesa:', error.message);
+      return {
+        success: false,
+        error: 'Network error: Could not reach M-Pesa servers. Please try again.'
+      };
+    } else if (error.message) {
+      // Validation error or other error during setup
+      console.error('❌ STK Push Error:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    } else {
+      // Unknown error
+      console.error('❌ Unknown STK Push error:', error);
+      return {
+        success: false,
+        error: 'Failed to initiate payment. Please try again.'
+      };
+    }
   }
 }
-
 // ==================== USER ROUTES ====================
 
 app.post('/api/auth/register', async (req, res) => {
@@ -715,6 +783,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
