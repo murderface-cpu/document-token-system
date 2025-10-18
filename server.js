@@ -277,6 +277,38 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
     }
   }
 }
+
+app.post('/api/user/use-token', authenticateToken, async (req, res) => {
+  const userId = new ObjectId(req.user.id);
+  const { documentId, tokensUsed } = req.body;
+  const cost = parseInt(tokensUsed || 1);
+
+  try {
+    const user = await db.collection('users').findOne({ _id: userId });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.tokens < cost) return res.status(400).json({ error: 'Insufficient tokens' });
+
+    // Deduct tokens
+    await db.collection('users').updateOne(
+      { _id: userId },
+      { $inc: { tokens: -cost } }
+    );
+
+    // Log the download
+    await db.collection('downloads').insertOne({
+      userId,
+      documentId,
+      tokensUsed: cost,
+      createdAt: new Date()
+    });
+
+    res.json({ success: true, message: `Deducted ${cost} token(s)` });
+  } catch (err) {
+    console.error('Error deducting token:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ==================== USER ROUTES ====================
 
 app.post('/api/auth/register', async (req, res) => {
@@ -783,6 +815,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
