@@ -282,7 +282,6 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
 app.post('/api/user/use-token', authenticateToken, async (req, res) => {
   const userId = new ObjectId(req.user.id);
   const { documentId, tokensUsed, documentName } = req.body;
-  console.log(req.body);
   const cost = parseInt(tokensUsed || 1);
 
   try {
@@ -300,7 +299,7 @@ app.post('/api/user/use-token', authenticateToken, async (req, res) => {
     await db.collection('downloads').insertOne({
       userId,
       documentId,
-      documentName: documentName,
+      documentName,
       tokensUsed: cost,
       createdAt: new Date()
     });
@@ -818,6 +817,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
