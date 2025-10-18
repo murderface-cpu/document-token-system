@@ -50,6 +50,7 @@ async function createIndexes() {
     // Downloads collection indexes
     await db.collection('downloads').createIndex({ userId: 1 });
     await db.collection('downloads').createIndex({ documentId: 1 });
+    await db.collection('downloads').createIndex({ documentName: 1 });
     await db.collection('downloads').createIndex({ createdAt: -1 });
     
     // Payment logs indexes
@@ -280,7 +281,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
 
 app.post('/api/user/use-token', authenticateToken, async (req, res) => {
   const userId = new ObjectId(req.user.id);
-  const { documentId, tokensUsed } = req.body;
+  const { documentId, tokensUsed, documentName } = req.body;
   const cost = parseInt(tokensUsed || 1);
 
   try {
@@ -298,6 +299,7 @@ app.post('/api/user/use-token', authenticateToken, async (req, res) => {
     await db.collection('downloads').insertOne({
       userId,
       documentId,
+      documentName,
       tokensUsed: cost,
       createdAt: new Date()
     });
@@ -815,6 +817,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
