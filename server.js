@@ -150,9 +150,9 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
       `${MPESA_CONFIG.businessShortCode}${MPESA_CONFIG.passkey}${timestamp}`
     ).toString('base64');
 
-    const formattedPhone = phoneNumber.startsWith('254')
-      ? phoneNumber
-      : phoneNumber.startsWith('0')
+    const formattedPhone = phoneNumber.startsWith('254') 
+      ? phoneNumber 
+      : phoneNumber.startsWith('0') 
       ? '254' + phoneNumber.slice(1)
       : '254' + phoneNumber;
 
@@ -161,7 +161,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
       Password: password,
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
-      Amount: amount,
+      Amount: Math.round(amount),
       PartyA: formattedPhone,
       PartyB: MPESA_CONFIG.businessShortCode,
       PhoneNumber: formattedPhone,
@@ -170,19 +170,42 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
       TransactionDesc: 'Token purchase'
     };
 
-    console.log('🟩 Sending STK Push payload:', payload);
+    console.log('📤 Sending STK Push payload:', payload);
 
-    const { data } = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+    const response = await axios.post(
+      `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
       payload,
-      { headers: { Authorization: `Bearer ${token}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
-    console.log('🟦 M-Pesa STK Push response:', data);
-    return data;
+    console.log('🟦 M-Pesa STK Push response:', response.data);
+
+    // ✅ Check for successful response
+    if (response.data.ResponseCode === '0') {
+      return {
+        success: true,
+        checkoutRequestId: response.data.CheckoutRequestID,
+        merchantRequestId: response.data.MerchantRequestID,
+        responseCode: response.data.ResponseCode,
+        responseDescription: response.data.ResponseDescription
+      };
+    } else {
+      return {
+        success: false,
+        error: response.data.ResponseDescription || response.data.CustomerMessage
+      };
+    }
   } catch (error) {
-    console.error('🟥 STK Push error:', error.response?.data || error.message);
-    throw error;
+    console.error('❌ STK Push error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.errorMessage || error.response?.data?.ResponseDescription || 'Failed to initiate payment'
+    };
   }
 }
 
@@ -307,10 +330,11 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
 });
 
 // ==================== TOKEN PURCHASE ROUTES ====================
-
 app.post('/api/tokens/purchase', authenticateToken, async (req, res) => {
   try {
     const { numberOfTokens, phoneNumber } = req.body;
+
+    console.log('📱 Purchase request:', { numberOfTokens, phoneNumber, userId: req.user.id });
 
     if (!numberOfTokens || numberOfTokens < 1) {
       return res.status(400).json({ error: 'Invalid number of tokens' });
@@ -342,17 +366,23 @@ app.post('/api/tokens/purchase', authenticateToken, async (req, res) => {
       `${accountReference}-${paymentId}`
     );
 
-    if (mpesaResponse.success) {
+    console.log('🔍 M-Pesa response:', mpesaResponse); // Add this log
+
+    // ✅ FIX: Check the actual response structure
+    if (mpesaResponse.success && mpesaResponse.checkoutRequestId) {
       // Update payment record with M-Pesa details
       await db.collection('payments').updateOne(
         { _id: paymentResult.insertedId },
         { 
           $set: { 
             checkoutRequestId: mpesaResponse.checkoutRequestId,
-            merchantRequestId: mpesaResponse.merchantRequestId
+            merchantRequestId: mpesaResponse.merchantRequestId,
+            responseDescription: mpesaResponse.responseDescription
           }
         }
       );
+
+      console.log('✅ Payment initiated successfully:', paymentId);
 
       res.json({
         success: true,
@@ -364,8 +394,10 @@ app.post('/api/tokens/purchase', authenticateToken, async (req, res) => {
       // Update payment status to failed
       await db.collection('payments').updateOne(
         { _id: paymentResult.insertedId },
-        { $set: { status: 'failed' } }
+        { $set: { status: 'failed', errorMessage: mpesaResponse.error } }
       );
+
+      console.log('❌ Payment failed:', mpesaResponse.error);
 
       res.status(400).json({
         success: false,
@@ -373,11 +405,13 @@ app.post('/api/tokens/purchase', authenticateToken, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Purchase error:', error);
-    res.status(500).json({ error: 'Purchase failed' });
+    console.error('❌ Purchase error:', error);
+    res.status(500).json({ 
+      error: 'Purchase failed', 
+      details: error.message 
+    });
   }
 });
-
 app.get('/api/payment/status/:paymentId', authenticateToken, async (req, res) => {
   try {
     const { paymentId } = req.params;
@@ -672,6 +706,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
