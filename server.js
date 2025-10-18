@@ -173,7 +173,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
     console.log('🟩 Sending STK Push payload:', payload);
 
     const { data } = await axios.post(
-      MPESA_BASE_URL,
+      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -672,6 +672,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
