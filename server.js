@@ -173,7 +173,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
     console.log('🟩 Sending STK Push payload:', payload);
 
     const { data } = await axios.post(
-      MPESA_CONFIG.stkPushUrl,
+      MPESA_BASE_URL,
       payload,
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -672,5 +672,6 @@ connectDB().then(() => {
   });
 
 });
+
 
 
