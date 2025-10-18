@@ -186,7 +186,7 @@ async function initiateStkPush(phoneNumber, amount, accountReference) {
       Timestamp: timestamp,
       TransactionType: 'CustomerPayBillOnline',
       Amount: roundedAmount,
-      PartyA: 254708374149,
+      PartyA: formattedPhone,
       PartyB: MPESA_CONFIG.businessShortCode,
       PhoneNumber: formattedPhone,
       CallBackURL: MPESA_CONFIG.callbackUrl,
@@ -783,6 +783,7 @@ connectDB().then(() => {
   });
 
 });
+
 
 
 
