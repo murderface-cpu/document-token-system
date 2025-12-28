@@ -29,7 +29,7 @@ npm install
 
 2. Create `.env` file:
 ```
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/document_store
+MONGO_URI=mongodb uri
 JWT_SECRET=your-super-secret-jwt-key
 MPESA_CONSUMER_KEY=your_consumer_key
 MPESA_CONSUMER_SECRET=your_consumer_secret
